@@ -9,6 +9,11 @@ import base64
 from tkinter import ttk
 from tkinter import PhotoImage
 
+def resource_path(rel_path):
+    """Return absolute path to resource, works for PyInstaller."""
+    base = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
+    return os.path.join(base, rel_path)
+
 import ctypes
 import platform
 # ────────────────────────────────────────────────────────────────────
@@ -96,7 +101,8 @@ class DriveComboBox(ttk.Frame):
 
     @property
     def root_path(self):              # e.g. 'C:\\'
-        return self.get() + ":\\"
+        d = self.get().rstrip(":")
+        return d + ":\\"
 
     def _scan_drives(self):
         drives = [f"{d}:" for d in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -705,15 +711,33 @@ class SetupWizard(ThinTitleMixin, tk.Tk):
     def _begin_install(self):
         self._show("install")
         def run():
-            total = 25
-            for n in range(total):
-                fname = "Steam.exe" if n == 0 else f"file_{n:02}.dat"
-                self.cur_lbl.config(
-                    text=f"Copying file:\n{self.install_dir.get()}\\{fname}")
-                for i in range(100):
-                    self._progress(self.cur_prog, i / 100)
-                    time.sleep(0.007)
-                self._progress(self.all_prog, (n + 1) / total)
+            src = resource_path("steam.exe")
+            dest_dir = self.install_dir.get()
+            os.makedirs(dest_dir, exist_ok=True)
+            dest = os.path.join(dest_dir, "steam.exe")
+
+            try:
+                total_size = os.path.getsize(src)
+            except OSError:
+                messagebox.showerror("Error", "steam.exe not found")
+                self.destroy()
+                return
+
+            copied = 0
+            chunk = 4096
+            self.cur_lbl.config(text=f"Copying file:\n{dest}")
+            with open(src, "rb") as fsrc, open(dest, "wb") as fdst:
+                while True:
+                    data = fsrc.read(chunk)
+                    if not data:
+                        break
+                    fdst.write(data)
+                    copied += len(data)
+                    frac = copied / total_size
+                    self._progress(self.cur_prog, frac)
+                    self._progress(self.all_prog, frac)
+                    time.sleep(0.01)
+
             messagebox.showinfo("Install complete",
                                 "Steam installation finished.")
             self.destroy()
