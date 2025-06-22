@@ -705,22 +705,26 @@ class SetupWizard(ThinTitleMixin, tk.Tk):
 
     def _begin_install(self):
         self._show("install")
-        def run():
-            src = resource_path("steam.exe")
-            dest_dir = self.install_dir.get()
-            os.makedirs(dest_dir, exist_ok=True)
-            dest = os.path.join(dest_dir, "steam.exe")
+        self.update_idletasks()
 
+        src = resource_path("steam.exe")
+        dest_dir = self.install_dir.get()
+        os.makedirs(dest_dir, exist_ok=True)
+        dest = os.path.join(dest_dir, "steam.exe")
+        self.cur_lbl.config(text=f"Copying file:\n{dest}")
+
+        def run():
             try:
                 total_size = os.path.getsize(src)
             except OSError:
-                messagebox.showerror("Error", "steam.exe not found")
-                self.destroy()
+                self.after(0, lambda: [
+                    messagebox.showerror("Error", "steam.exe not found"),
+                    self.destroy()
+                ])
                 return
 
             copied = 0
             chunk = 4096
-            self.cur_lbl.config(text=f"Copying file:\n{dest}")
             with open(src, "rb") as fsrc, open(dest, "wb") as fdst:
                 while True:
                     data = fsrc.read(chunk)
@@ -729,13 +733,16 @@ class SetupWizard(ThinTitleMixin, tk.Tk):
                     fdst.write(data)
                     copied += len(data)
                     frac = copied / total_size
-                    self._progress(self.cur_prog, frac)
-                    self._progress(self.all_prog, frac)
+                    self.after(0, self._progress, self.cur_prog, frac)
+                    self.after(0, self._progress, self.all_prog, frac)
                     time.sleep(0.01)
 
-            messagebox.showinfo("Install complete",
-                                "Steam installation finished.")
-            self.destroy()
+            self.after(0, lambda: [
+                messagebox.showinfo("Install complete",
+                                   "Steam installation finished."),
+                self.destroy()
+            ])
+
         threading.Thread(target=run, daemon=True).start()
 
 # ────────────────────────────────────────────────────────────────────────────────
