@@ -13,7 +13,6 @@ def resource_path(rel_path):
     """Return absolute path to resource, works for PyInstaller."""
     base = getattr(sys, '_MEIPASS', os.path.abspath(os.path.dirname(__file__)))
     return os.path.join(base, rel_path)
-
 import ctypes
 import platform
 # ────────────────────────────────────────────────────────────────────
@@ -25,18 +24,16 @@ from ctypes import wintypes
 # Embedded 16×16 classic Windows icons  (complete base-64 strings)
 # ────────────────────────────────────────────────────────────────
 _DRIVE_GIF = """
-R0lGODlhEAAQAJEAAAAAAP///wAAACH5BAEAAAIALAAAAAAQABAAAAIrlI+py+0Po5y02ouz3pwXADs=
+R0lGODdhEAAQAIEAAAAAAObm5gAAAMDAwCwAAAAAEAAQAEAIRwABCBxIsKBAAQMCKFzIcICAgwIiSpwoESLFiw8NaiSIkKHHAA4PJvy4MOTGkyhTpkQ4oKXLlyY7klQYc+TMmjBzZlTJ02BAADs=
 """
 
 _FLD_CLOSED_GIF = """
-R0lGODlhEAAQAMQAAP////z8/Pv7+/Ly8u7u7tTU1NPT08nJycfHx7Ozs6+vr6mpqaysrKenp6Ojo4OD
-g3V1dXd3d3FxcXFxcXV1dbm5uZSUlKSkpP///yH5BAEAAB8ALAAAAAAQABAAAAWq4CeOZGmeaKqubOtC
-zPDzvLJbjT4biSJbmKqHicrvfBQAOw==
+R0lGODdhEAAQAIEAAP/IAICAAAAAAP/cMCwAAAAAEAAQAEAITwAFCBxIsKCAAAASKly4MIDAAAMiShzgkCBChhgTVgzAsWPHggg9imx4MSNDjiYxVjTIciDEiRFXPuQIM6bIkik14syJMqfCnj4B3BzqMSAAOw==
+"""
+_FLD_OPEN_GIF = """
+R0lGODdhEAAQAIEAAAAAAICAAP/IAP/cMCwAAAAAEAAQAEAISAABCBxIsKDAAAgTKlw4MMCAhw8DGDwooKLFiwIkNlyocSLHjgUDYBwJ8qPCiSgNOoQ4AGRIli1TyiQociRJijYtlsyZcebEgAA7
 """
 
-_FLD_OPEN_GIF = """
-R0lGODlhEAAQAMQAAP////7+/vj4+Pf39+7u7uPj48/Pz9nZ2dPT08vLy8nJycbGxsLCwsHBwcDAwL+/v7y8vLW1tbGxsbCwsLe3t729vevr6+np6eDg4Nvb29jY2NfX19bW1tTU1NXV1dLS0tHR0dDQ0M/Pz9bW1tLS0tDQ0MHBwcDAwL+/v////////yH5BAEAAB8ALAAAAAAQABAAAAWu4CeOZGmeaKqubOtCzPDzvLJbjT4biSJbmKqHicrvfBQAOw==
-"""
 
 # ── tiny yellow/grey 16×16 fallback images ─────────────────────────
 def _make_fallback(master, colour):
@@ -180,31 +177,28 @@ class FolderList(ttk.Treeview):
     def _build(self):
         cur = self.root_dir
         drive_root = os.path.splitdrive(cur)[0] + os.sep
+        at_root = os.path.abspath(cur) == os.path.abspath(drive_root)
 
-        # ➊ “..” only if we’re not at drive root
-        if os.path.abspath(cur) != os.path.abspath(drive_root):
-            # '..' takes us to the parent folder (store that path)
+        if not at_root:
             self.insert("", "end", text="..", image=self._closed,
                         values=(os.path.dirname(cur),), tags=("dotdot",))
 
-        # Drive-root line (e.g. 'F:\\') when we are at drive root
-        if os.path.abspath(cur) == os.path.abspath(drive_root):
+        if at_root:
             root_iid = self.insert("", "end", text=drive_root,
                                    image=self._open, open=True,
                                    values=(cur,))
-            self.insert(root_iid, "end")             # <-- dummy first
-            self._populate(root_iid)                 # now really fills list
-            # make it the row that receives <Return> / arrow actions
+            self.insert(root_iid, "end")
+            self._populate(root_iid)
             self.selection_set(root_iid)
-
-        # ➋ list sub-folders of cur
-        for name in sorted(os.listdir(cur)):
-            full = os.path.join(cur, name)
-            if os.path.isdir(full):
-                iid = self.insert("", "end", text=name,
-                                  image=self._closed, values=(full,))
-                self.insert(iid, "end")          # dummy child
-                if full == cur: self._current_iid = iid
+        else:
+            for name in sorted(os.listdir(cur)):
+                full = os.path.join(cur, name)
+                if os.path.isdir(full):
+                    iid = self.insert("", "end", text=name,
+                                      image=self._closed, values=(full,))
+                    self.insert(iid, "end")
+                    if full == cur:
+                        self._current_iid = iid
 
 
     def _refresh(self, _=None):
@@ -308,9 +302,10 @@ class ThinTitleMixin:
         self._cap.pack(fill=tk.X, side=tk.TOP)
 
         # icon  --------------------------------------------------------------
+        ico_path = resource_path(ico)
         try:
-            self.iconbitmap(ico)
-            icon = tk.PhotoImage(file=ico)
+            self.iconbitmap(ico_path)
+            icon = tk.PhotoImage(file=ico_path)
         except Exception:
             icon = tk.PhotoImage(width=16, height=16)
             icon.put(("black",), to=(0, 0, 15, 15))
